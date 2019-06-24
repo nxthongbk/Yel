@@ -1,4 +1,4 @@
-# mangOH Red DV6 Production Testing
+# mangOH Yellow DV3 Production Testing
 
 ## Required Hardware
 - mangOH Yellow
