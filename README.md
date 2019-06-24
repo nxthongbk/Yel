@@ -11,5 +11,5 @@ The production testing software is written in python.
 Run the `program_module.sh` script should
 be run to copy necessary scripts and config to the golden module before testing.
 
-Once the module has been programmed, the user just needs to run `~/test_script_mangOH_red.py` and
+Once the module has been programmed, the user just needs to run `~/test_script_mangOHYellow.py` and
 follow the prompts.
