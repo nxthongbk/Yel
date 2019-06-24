@@ -1,7 +1,7 @@
 # mangOH Yellow DV3 Production Testing
 
 ## Required Hardware
-- mangOH Yellow
+- mangOH Yellow DV3
 - WP8548 CF3 module
 
 ## Software
