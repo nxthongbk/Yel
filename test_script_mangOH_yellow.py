@@ -50,7 +50,7 @@ def test_light_sensor():
 	#     Cover light sensor with finger and confirm software-controlled tri-colour LED goes blue;
 	#     (On-board test software should look for light sensor interrupt.)
 	before_cover_value = read_light_sensor()
-	resp = prompt_char("Please cover the light sensor with your finger").upper()
+	resp = prompt_char("Please cover the light sensor with your finger then press ENTER").upper()
 	after_cover_value = read_light_sensor()
 	if before_cover_value - after_cover_value > 100:
 		# triLED go blue
@@ -64,7 +64,7 @@ def test_light_sensor():
 		return TestFailure("Light sensor has problem")
 
 	#     Uncover light sensor and confirm LED returns to yellow;
-	resp = prompt_char("Please uncover the light sensor").upper()
+	resp = prompt_char("Please uncover the light sensor then press ENTER").upper()
 	after_uncover_value = read_light_sensor()
 	if after_uncover_value - after_cover_value > 100:
 		# triLED go yellow
@@ -79,6 +79,11 @@ def test_light_sensor():
 
 	return TestSuccess()
 
+def write_eeprom():
+	with open('/sys/bus/i2c/devices/0-0050/eeprom', 'w') as eeprom:
+		eeprom.write("mangOH Yellow with Legato 19.01.0 and custom Yocto image\x00")
+
+	return TestSuccess()
 
 def prompt_char(p):
 	print('  > ' + p)
@@ -150,6 +155,9 @@ def test_buzzer():
 	while resp != "Y" and resp != "N":
 		resp = prompt_char("Press button and listen for buzzer\r\nDo you here the buzzer's sound when pressing button? (Y/N)").upper()
 	if resp == "N":
+		bthread.updateCallback()
+		bthread.cancel.set()
+		bthread.join()
 		return TestFailure("Buzzer did not work")
 	
 	bthread.updateCallback()
@@ -248,15 +256,14 @@ def yellowManualTest_initial():
 	if resp == "N":
 		return TestFailure("The power has problem")
 	print "Connect unit to USB hub (both console and main USB);"
-
-	#     Wait for software-controlled tri-colour LED to turn green (ready for manual test);
+	
 	triLED("red", "off")
 	triLED("green", "on")
 	triLED("blue", "off")
 
 	resp = ""
 	while resp != "Y" and resp != "N":
-		resp = prompt_char("Do you see software-controlled LED go green? (Y/N)").upper()
+		resp = prompt_char("Do you see software-controlled LED goes green? (Y/N)").upper()
 	if resp == "N":
 		return TestFailure("Software-controller LED has problem")
 	
@@ -298,12 +305,78 @@ def yellowManualTest_final():
 	# 27. Unplug SIM, SD card, IoT card and expansion-connector test board.
 	return TestSuccess()
 
+def test_automation():
+	os.system('PATH=/legato/systems/current/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin /etc/init.d/syslog stop')
+	time.sleep(2)
+	os.system('PATH=/legato/systems/current/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin /etc/init.d/syslog start')
+	time.sleep(2)
+	os.system("/legato/systems/current/bin/app start YellowTest")
+	time.sleep(20)
+	(returncode, stdoutdata, stderrdata) = run_cmd("logread")
+	print stdoutdata
+	expected_msgs = [
+		"Check signal quality: PASSED",
+		"Check main bus I2C: PASSED",
+		"Check port 1 hub I2C: PASSED",
+		"Check port 2 hub I2C: PASSED",
+		"Check port 3 hub I2C: PASSED",
+		"Read accelerometer and gyroscope: PASSED",
+	]
+	for msg in expected_msgs:
+		if msg in stdoutdata:
+			print "Found: " + msg
+		else:
+			os.system("/legato/systems/current/bin/app stop YellowTest")
+			return TestFailure("Automation test failed")
+
+	os.system("/legato/systems/current/bin/app stop YellowTest")
+	return TestSuccess()
+
 Tests = [
-	
+	# 1. Plug in SIM, microSD card, IoT test card, and expansion-connector test board;
+	# 2. Connect power jumper across pins 2 & 3;
+	# 3. Confirm "battery protect" switch is ON (preventing the device from booting on battery power);
+	# 4. Connect battery;
+	# 5. Switch "battery protect" switch OFF (allowing the device to boot on battery power);
+	# 6. Verify hardware-controlled tri-colour LED goes green;
+	# 7. Connect unit to USB hub (both console and main USB);
+	# 8. Wait for software-controlled tri-colour LED to turn green (ready for manual test);
 	Test("Initial", yellowManualTest_initial),
+	
+	# 8. Press button and listen for buzzer;
 	Test("Buzzer", test_buzzer),
+
+	# 10. Plug in headset;
+	# 11. Say something into headset, and listen for own voice echoed back through headset;
+	# 12. Press button to switch audio test mode (software-controlled tri-colour LED goes yellow);
+	# 13. Say something into the on-board microphone;
+	# 14. Listen for your own voice echoed back through headset;
+
+	# 15. Bring NFC tag reader close to the mangOH board and confirm green LED flashes;
+	#     (On-board test software should look for the NFC Field Detection interrupt.)
+
+	# 16. Cover light sensor with finger and confirm software-controlled tri-colour LED goes blue;
+	#     (On-board test software should look for light sensor interrupt.)
+	# 17. Uncover light sensor and confirm LED returns to yellow;
 	Test("Light Sensor", test_light_sensor),
+
+	# 18. Switch cellular antenna selection DIP switch;
+	# 19. Press button to finalize the test;
+	#     (On-board test software should verify that the correct string has been written to the NFC tag.)
+	# 20. Confirm software-controlled tri-colour LED has changed to white;
+	# 21. Confirm hardware-controlled LED is yellow;
+	# 22. Press reset button;
+	# 23. Confirm hardware-controlled LED goes green;
+	# 24. Remove power jumper;
+	# 25. Disconnect from USB;
+	# 26. Disconnect battery;
+	# 27. Unplug SIM, SD card, IoT card and expansion-connector test board.
 	Test("End", yellowManualTest_final),
+
+	# EEPROM testing
+	Test("eeprom", write_eeprom),
+
+	Test("automation", test_automation),
 ]
 
 if __name__ == '__main__':
